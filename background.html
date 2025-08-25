@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Background</title>
+</head>
+<body>
+    <script>
+        class BackgroundController {
+            constructor() {
+                this.IN_GAME_WINDOW = "in_game";
+                this.DESKTOP_WINDOW = "desktop";
+                this.HELL_LET_LOOSE_ID = 22134;
+
+                // MUDANÇA: A gestão dos IDs é feita dinamicamente, não precisamos de os pré-carregar.
+            }
+
+            async run() {
+                // MUDANÇA: Não obtemos mais os IDs das janelas na inicialização.
+                this.setHotkeysListener();
+                this.setGameEventListeners();
+                
+                // MUDANÇA: Chamamos a nova função que decide qual janela abrir.
+                this.launchCorrectWindow();
+
+                overwolf.extensions.onAppLaunchTriggered.addListener(() => {
+                    this.launchCorrectWindow();
+                });
+            }
+            
+            // MUDANÇA: A função obtainWindowIds() foi removida, pois não é mais necessária.
+
+            // MUDANÇA: Esta é a nova função principal para abrir/fechar janelas.
+            async launchCorrectWindow() {
+                 const gameInfo = await this.getGameInfo();
+                 const isGameRunning = gameInfo && gameInfo.isRunning && gameInfo.classId === this.HELL_LET_LOOSE_ID;
+                 
+                 const windowToOpen = isGameRunning ? this.IN_GAME_WINDOW : this.DESKTOP_WINDOW;
+                 const windowToClose = isGameRunning ? this.DESKTOP_WINDOW : this.IN_GAME_WINDOW;
+
+                 // Obtém e restaura a janela correta
+                 overwolf.windows.obtainDeclaredWindow(windowToOpen, (result) => {
+                    if (result.success) {
+                        overwolf.windows.restore(result.window.id);
+                    }
+                 });
+
+                 // Garante que a outra janela está fechada
+                 overwolf.windows.obtainDeclaredWindow(windowToClose, (result) => {
+                    if (result.success) {
+                        overwolf.windows.close(result.window.id);
+                    }
+                 });
+            }
+
+            getGameInfo() {
+                return new Promise(resolve => overwolf.games.getRunningGameInfo(resolve));
+            }
+
+            setGameEventListeners() {
+                overwolf.games.onGameInfoUpdated.addListener(async (event) => {
+                    // Apenas reage se o estado de "a correr" do jogo mudar.
+                    if (event.gameInfo && event.gameInfo.classId === this.HELL_LET_LOOSE_ID && event.runningChanged) {
+                        // MUDANÇA: Reutilizamos a nossa nova função centralizada.
+                        this.launchCorrectWindow();
+                    }
+                });
+            }
+
+            setHotkeysListener() {
+                overwolf.settings.hotkeys.onPressed.addListener(async (hotkeyResult) => {
+                    // MUDANÇA: Determinamos dinamicamente qual a janela ativa para enviar a mensagem.
+                    const gameInfo = await this.getGameInfo();
+                    const isGameRunning = gameInfo && gameInfo.isRunning && gameInfo.classId === this.HELL_LET_LOOSE_ID;
+                    const activeWindow = isGameRunning ? this.IN_GAME_WINDOW : this.DESKTOP_WINDOW;
+
+                    if (hotkeyResult.name === 'increase_meters' || hotkeyResult.name === 'decrease_meters') {
+                        const step = hotkeyResult.name === 'increase_meters' ? 1 : -1;
+                        const message = { id: 'update_meters', content: { step: step } };
+                        
+                        overwolf.windows.obtainDeclaredWindow(activeWindow, result => {
+                            if (result.success) {
+                                overwolf.windows.sendMessage(result.window.id, message.id, message.content, () => {});
+                            }
+                        });
+                    }
+
+                    if (hotkeyResult.name === 'toggle_show') {
+                       this.toggleVisibleWindow();
+                    }
+                });
+                
+                overwolf.settings.hotkeys.onChanged.addListener((hotkeyInfo) => {
+                    console.log('Hotkey foi alterada nas configurações! Notificando as janelas da UI.', hotkeyInfo);
+                    const message = { id: 'hotkey_changed' };
+                    
+                    // MUDANÇA: Envia a mensagem de forma mais segura.
+                    overwolf.windows.obtainDeclaredWindow(this.DESKTOP_WINDOW, result => {
+                       if (result.success) overwolf.windows.sendMessage(result.window.id, message.id, null, () => {});
+                    });
+                     overwolf.windows.obtainDeclaredWindow(this.IN_GAME_WINDOW, result => {
+                       if (result.success) overwolf.windows.sendMessage(result.window.id, message.id, null, () => {});
+                    });
+                });
+            }
+
+            async toggleVisibleWindow() {
+                const gameInfo = await this.getGameInfo();
+                const isGameRunning = gameInfo && gameInfo.isRunning && gameInfo.classId === this.HELL_LET_LOOSE_ID;
+                const windowIdToToggle = isGameRunning ? this.IN_GAME_WINDOW : this.DESKTOP_WINDOW;
+
+                overwolf.windows.obtainDeclaredWindow(windowIdToToggle, (result) => {
+                    if (result.success) {
+                        const windowId = result.window.id;
+                        overwolf.windows.getWindowState(windowId, (stateResult) => {
+                            if (stateResult.success && (stateResult.window_state_ex === "normal" || stateResult.window_state_ex === "maximized")) {
+                                overwolf.windows.hide(windowId);
+                            } else {
+                                // MUDANÇA: Em vez de apenas restaurar, chamamos a função principal
+                                // para garantir que o contexto correto é respeitado.
+                                this.launchCorrectWindow();
+                            }
+                        });
+                    }
+                });
+            }
+        }
+
+        const bgController = new BackgroundController();
+        bgController.run();
+    </script>
+</body>
+</html>

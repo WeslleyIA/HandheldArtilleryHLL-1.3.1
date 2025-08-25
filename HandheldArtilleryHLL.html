@@ -1,0 +1,1086 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Handheld Artillery HLL</title>
+    <script src="https://content.overwolf.com/libs/ads/latest/owads.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&display=swap');
+        :root{--primary-bg:#282c34;--secondary-bg:#1e2228;--font-color:#d1d1d1;--accent-color:#61afef;--border-color:#4b5263;--danger-color:#c84141;--success-color:#98c379;--axis-color:#E5C07B;}
+        
+        body{font-family:'Roboto Mono',monospace;background-color:transparent;color:var(--font-color);margin:0;padding:0;user-select:none;overflow:hidden;}
+        
+        .app-container{width:100%;height:100%;background-color:rgba(40,44,52,0.95);border:1px solid var(--border-color);border-radius:5px;overflow:hidden;transition:all 0.3s ease;box-sizing:border-box;display:flex;flex-direction:column;}
+        
+        .header {
+            background-color: var(--secondary-bg);
+            padding: 0 8px;
+            font-weight: bold;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: relative;
+            height: 40px;
+            -webkit-app-region: drag;
+        }
+        .header-title-container {
+            flex-grow: 1;
+            text-align: center;
+            color: var(--font-color);
+        }
+        .window-controls {
+            display: flex;
+            -webkit-app-region: no-drag;
+        }
+        .window-control-btn {
+            background: transparent;
+            border: none;
+            color: var(--font-color);
+            font-size: 18px;
+            font-weight: bold;
+            width: 40px;
+            height: 40px;
+            line-height: 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+        .window-control-btn:hover {
+            background-color: var(--danger-color);
+        }
+        #minimize-btn:hover {
+            background-color: var(--border-color);
+        }
+
+        .tabs {
+            display: flex;
+            background-color: var(--secondary-bg);
+            border-bottom: 1px solid var(--border-color);
+        }
+        .tab-btn {
+            flex: 1;
+            padding: 10px;
+            background-color: transparent;
+            border: none;
+            color: var(--font-color);
+            font-family: 'Roboto Mono', monospace;
+            font-size: 14px;
+            cursor: pointer;
+            transition: background-color 0.2s ease, border-bottom 0.2s ease;
+            border-bottom: 3px solid transparent;
+        }
+        .tab-btn:hover {
+            background-color: var(--primary-bg);
+        }
+        .tab-btn.active {
+            color: var(--accent-color);
+            border-bottom: 3px solid var(--accent-color);
+            font-weight: bold;
+        }
+
+        .main-content{padding:10px 15px;flex-grow:1;overflow-y:auto;}
+        .app-description{font-size:11px;text-align:center;opacity:0.7;margin-top:5px;}
+        .hotkey-info{font-size:10px;text-align:center;opacity:0.6;margin-top:10px;border-top:1px dashed var(--border-color);padding-top:8px;}
+        .hotkey-info kbd{background-color:var(--border-color);padding:1px 3px;border-radius:3px;}
+        .form-group{margin-top:10px;position:relative;}
+        .form-group label{display:block;margin-bottom:5px;font-size:12px;font-weight:bold;}
+        select,input[type="number"]{width:100%;padding:8px;background-color:var(--secondary-bg);border:1px solid var(--border-color);border-radius:4px;color:var(--font-color);font-family:'Roboto Mono',monospace;box-sizing:border-box;}
+        input[type="number"]{font-size:22px;text-align:center;}
+        input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0;}
+        input[type=number]{-moz-appearance:textfield;}
+        .result-group{margin-top:15px;text-align:center;}
+        #elevation-output {font-size:28px;font-weight:bold;color:var(--accent-color);background-color:var(--secondary-bg);padding:10px;border-radius:4px;border:1px solid var(--border-color);min-height:40px;cursor:default;}
+        
+        #map-display-container {
+            width: 100%;
+            padding-top: 100%;
+            background-color: var(--secondary-bg);
+            border: 1px solid var(--border-color);
+            margin-top: 10px;
+            border-radius: 4px;
+            position: relative;
+            overflow: hidden;
+            cursor: crosshair;
+        }
+        
+        #map-transform-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            transform-origin: 0 0;
+        }
+
+        #map-image {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            pointer-events: none;
+        }
+        
+        .map-icon {
+            position: absolute;
+            transform: translate(-50%, -50%);
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            border: 1.5px solid white;
+            box-shadow: 0 0 3px rgba(0,0,0,0.7);
+        }
+        .arty-icon {
+            cursor: pointer;
+            z-index: 10;
+        }
+        .arty-icon.allies {
+            background-color: var(--accent-color);
+        }
+        .arty-icon.axis {
+            background-color: var(--axis-color);
+        }
+        .arty-icon.selected {
+            border: 2px solid #f1c40f;
+        }
+        .target-icon {
+            background-color: #c84141;
+            pointer-events: none;
+            z-index: 5;
+            display: none;
+        }
+        .green-marker-icon {
+            background-color: var(--success-color);
+            pointer-events: none;
+            z-index: 4;
+            display: none;
+        }
+        
+        #map-elevation-display {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(40, 44, 52, 0.9);
+            color: var(--accent-color);
+            padding: 5px 10px;
+            border-radius: 4px;
+            border: 1px solid var(--border-color);
+            font-size: 16px;
+            font-weight: bold;
+            z-index: 20;
+            pointer-events: none;
+            display: none;
+            white-space: nowrap;
+        }
+
+        #map-hint-display {
+            position: absolute;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(200, 65, 65, 0.9);
+            color: white;
+            padding: 8px 15px;
+            border-radius: 4px;
+            border: 1px solid var(--danger-color);
+            font-size: 14px;
+            font-weight: bold;
+            z-index: 20;
+            pointer-events: none;
+            white-space: nowrap;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+        }
+
+        .ad-container-400x300, .ad-container-400x60 {
+            background-color: var(--secondary-bg);
+            border: 1px dashed var(--border-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 18px;
+            font-weight: bold;
+            color: #666;
+            box-sizing: border-box;
+        }
+        .ad-container-400x300 {
+            width: 400px;
+            height: 300px;
+            margin: 10px auto 5px auto;
+        }
+        
+        .ad-container-400x60 {
+            width: 400px;
+            height: 60px;
+            margin: 0 auto 10px auto;
+        }
+        
+        .footer {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            padding: 5px 10px;
+            background-color: var(--secondary-bg);
+            border-top: 1px solid var(--border-color);
+            flex-shrink: 0;
+            -webkit-app-region: drag;
+        }
+        .footer button {
+             -webkit-app-region: no-drag;
+        }
+
+        .footer button{background-color:var(--border-color);border:none;color:var(--font-color);padding:5px 10px;border-radius:3px;cursor:pointer;font-family:'Roboto Mono',monospace;}
+        
+        .compact-layout .header, .compact-layout .app-description, .compact-layout .hotkey-info, .compact-layout .result-group label, .compact-layout .form-group > label, .compact-layout #faction-select-group, .compact-layout .ad-container-400x300, .compact-layout .ad-container-400x60, .compact-layout .tabs, .compact-layout #map-content .form-group {display: none;}
+        .app-container.compact-layout {width: 240px;}
+        .compact-layout .main-content {padding: 8px;}
+        .compact-layout .form-group {margin-top: 8px;}
+        .compact-layout .result-group {margin-top: 8px;}
+        .compact-layout input[type="number"] {font-size: 20px; padding: 6px;}
+        .compact-layout #elevation-output {font-size: 24px; padding: 8px; min-height: 32px;}
+        .compact-layout .footer {padding: 8px; justify-content: center;}
+        .compact-layout #map-elevation-display { top: 2px; font-size: 14px; }
+        .compact-layout .map-icon { width: 8px; height: 8px; border-width: 1.5px; }
+        .compact-layout .arty-icon.selected { border-width: 2px; }
+
+        /* CORREÇÃO: Estilos para o aviso no modo compacto */
+        .compact-layout #map-hint-display {
+            font-size: 12px;
+            padding: 6px 10px;
+            bottom: 5px;
+            white-space: normal; /* Permite que o texto quebre a linha */
+            text-align: center;
+            max-width: 90%;
+        }
+
+
+        #settings-btn:hover {
+            background-color: var(--border-color);
+        }
+        .settings-modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.6);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+        .settings-modal-content {
+            background-color: var(--primary-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            width: 95%;
+            max-width: 420px;
+        }
+        .settings-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 15px;
+            border-bottom: 1px solid var(--border-color);
+            background-color: var(--secondary-bg);
+        }
+        .settings-header h2 {
+            margin: 0;
+            font-size: 16px;
+            -webkit-app-region: drag;
+            flex-grow: 1;
+            padding: 10px 0;
+        }
+        .settings-header .window-control-btn {
+            width: 30px;
+            height: 30px;
+            line-height: 30px;
+            font-size: 16px;
+        }
+        .settings-body {
+            padding: 10px 15px 15px 15px;
+            overflow-y: auto;
+        }
+        .settings-section {
+            margin-top: 15px;
+        }
+        .settings-section:first-child {
+            margin-top: 0;
+        }
+        .settings-section h3 {
+            margin: 0 0 10px 0;
+            font-size: 14px;
+            color: var(--accent-color);
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 5px;
+        }
+        .settings-item, .hotkey-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+        .hotkey-item {
+            padding: 5px 0;
+            color: var(--font-color);
+        }
+        .hotkey-combo {
+            background-color: var(--secondary-bg);
+            border: 1px solid var(--border-color);
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+            min-width: 150px;
+            text-align: center;
+            color: var(--font-color);
+        }
+        .hotkey-combo:hover {
+            background-color: #3a3f4b;
+        }
+        .settings-select {
+            width: 100%;
+            padding: 8px;
+            background-color: var(--secondary-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            color: var(--font-color);
+            font-family: 'Roboto Mono', monospace;
+            box-sizing: border-box;
+        }
+    </style>
+</head>
+<body>
+    <div id="app-container" class="app-container full-layout">
+        <div id="header" class="header">
+            <div class="header-title-container" data-i18n="app_title">Handheld Artillery HLL</div>
+            <div class="window-controls">
+                <button class="window-control-btn" id="settings-btn" title="Settings">⚙️</button>
+                <button class="window-control-btn" id="minimize-btn" title="Minimize">_</button>
+                <button class="window-control-btn" id="close-btn" title="Close">X</button>
+            </div>
+        </div>
+        
+        <div class="tabs">
+            <button id="tab-calculator" class="tab-btn active" data-i18n="tab_calculator">Calculadora</button>
+            <button id="tab-map" class="tab-btn" data-i18n="tab_map">Calculadora no Mapa</button>
+        </div>
+
+        <div class="ad-container-400x60" id="ad-container-400x60"></div>
+        
+        <div class="main-content">
+            <div id="calculator-content">
+                <p class="app-description" data-i18n="app_desc">Artillery calculator for Hell Let Loose</p>
+                <div id="faction-select-group" class="form-group">
+                    <label for="faction-select" data-i18n="faction_label">Faction</label>
+                    <select id="faction-select">
+                        <option value="usa_ger" data-i18n="faction_us_ger">USA & Germany</option>
+                        <option value="gbr" data-i18n="faction_gbr">Great Britain</option>
+                        <option value="ussr" data-i18n="faction_ussr">Soviet Union</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="meters-input">
+                        <span data-i18n="meters_label">Meters</span>
+                    </label>
+                    <input type="number" id="meters-input" step="1" min="100" max="1600" value="100">
+                </div>
+                <div class="result-group">
+                    <label data-i18n="elevation_label">Elevation (MIL)</label>
+                    <div id="elevation-output">...</div>
+                </div>
+                <div class="hotkey-info" data-i18n="hotkey_info">
+                    </div>
+            </div>
+
+            <div id="map-content" style="display: none;">
+                <div class="form-group">
+                    <label for="map-select" data-i18n="map_label">Selecione o Mapa</label>
+                    <select id="map-select"></select>
+                </div>
+                
+                <div id="map-display-container">
+                    <div id="map-elevation-display"></div>
+                    <div id="map-hint-display" style="display: none;"></div>
+                    <div id="map-transform-container">
+                        <img id="map-image" src="" alt="Map of Hell Let Loose">
+                        </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="ad-container-400x300" id="ad-container-400x300"></div>
+        
+        <div class="footer">
+            <button id="toggle-layout-button" data-i18n="toggle_layout_btn">Compact</button>
+        </div>
+    </div>
+
+    <div id="settings-modal" class="settings-modal-overlay" style="display: none;">
+        <div class="settings-modal-content">
+            <div class="settings-header">
+                <h2 data-i18n="settings_title">Settings</h2>
+                <button id="settings-close-btn" class="window-control-btn">X</button>
+            </div>
+            <div class="settings-body">
+                <div class="settings-section">
+                    <h3 data-i18n="language_section_title">Language</h3>
+                    <div class="settings-item">
+                         <select id="language-select-settings" class="settings-select"></select>
+                    </div>
+                </div>
+                
+                <div class="settings-section">
+                    <h3 data-i18n="hotkeys_section_title">Hotkeys</h3>
+                    <div id="hotkeys-container">
+                        </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        const I18n = (() => {
+            const translations = {
+                "en-US": { "lang_name": "English", "app_title": "Handheld Artillery HLL", "app_desc": "Artillery calculator for Hell Let Loose", "faction_label": "Faction", "faction_us_ger": "USA & Germany", "faction_gbr": "Great Britain", "faction_ussr": "Soviet Union", "meters_label": "Meters", "elevation_label": "Elevation (MIL)", "hotkey_info": "Use hotkeys to show/hide and adjust meters.", "toggle_layout_btn": "Compact", "toggle_layout_btn_full": "Full", "out_of_range": "Out of Range", "settings_title": "Settings", "language_section_title": "Language", "hotkeys_section_title": "Hotkeys", "hotkey_listening": "Press a key...", "hotkey_unassigned": "Unassigned", "tab_calculator": "Calculator", "tab_map": "Map Calculator", "map_label": "Select Map", "map_alt_text": "Map of Hell Let Loose", "hint_select_arty": "Select an artillery piece first.", "calc_target": "Target", "calc_marker": "Marker" },
+                "pt-BR": { "lang_name": "Português", "app_title": "Artilharia Portátil HLL", "app_desc": "Calculadora de artilharia para Hell Let Loose", "faction_label": "Facção", "faction_us_ger": "EUA & Alemanha", "faction_gbr": "Grã-Bretanha", "faction_ussr": "União Soviética", "meters_label": "Metros", "elevation_label": "Elevação (MIL)", "hotkey_info": "Use as teclas de atalho para mostrar/ocultar e ajustar os metros.", "toggle_layout_btn": "Compacto", "toggle_layout_btn_full": "Completo", "out_of_range": "Fora de Alcance", "settings_title": "Configurações", "language_section_title": "Idioma", "hotkeys_section_title": "Teclas de Atalho", "hotkey_listening": "Pressione uma tecla...", "hotkey_unassigned": "Não atribuído", "tab_calculator": "Calculadora", "tab_map": "Calculadora no Mapa", "map_label": "Selecione o Mapa", "map_alt_text": "Mapa de Hell Let Loose", "hint_select_arty": "Selecione uma peça de artilharia primeiro.", "calc_target": "Alvo", "calc_marker": "Marcação" },
+                "de-DE": { "lang_name": "Deutsch", "app_title": "Handheld Artillerie HLL", "app_desc": "Artillerie-Rechner für Hell Let Loose", "faction_label": "Fraktion", "faction_us_ger": "USA & Deutschland", "faction_gbr": "Großbritannien", "faction_ussr": "Sowjetunion", "meters_label": "Meter", "elevation_label": "Erhebung (MIL)", "hotkey_info": "Benutze Hotkeys zum Ein-/Ausblenden und Anpassen.", "toggle_layout_btn": "Kompakt", "toggle_layout_btn_full": "Vollständig", "out_of_range": "Außer Reichweite", "settings_title": "Einstellungen", "language_section_title": "Sprache", "hotkeys_section_title": "Hotkeys", "hotkey_listening": "Taste drücken...", "hotkey_unassigned": "Nicht zugewiesen", "tab_calculator": "Rechner", "tab_map": "Kartenrechner", "map_label": "Karte auswählen", "map_alt_text": "Karte von Hell Let Loose", "hint_select_arty": "Wähle zuerst ein Artilleriegeschütz aus.", "calc_target": "Ziel", "calc_marker": "Markierung" },
+                "ru-RU": { "lang_name": "Русский", "app_title": "Портативная Артиллерия HLL", "app_desc": "Артиллерийский калькулятор для Hell Let Loose", "faction_label": "Фракция", "faction_us_ger": "США и Германия", "faction_gbr": "Великобритания", "faction_ussr": "Советский Союз", "meters_label": "Метры", "elevation_label": "Возвышение (MIL)", "hotkey_info": "Используйте горячие клавиши для показа и настройки.", "toggle_layout_btn": "Компактный", "toggle_layout_btn_full": "Полный", "out_of_range": "Вне диапазона", "settings_title": "Настройки", "language_section_title": "Язык", "hotkeys_section_title": "Горячие клавиши", "hotkey_listening": "Нажмите клавишу...", "hotkey_unassigned": "Не назначена", "tab_calculator": "Калькулятор", "tab_map": "Калькулятор на карте", "map_label": "Выберите карту", "map_alt_text": "Карта Hell Let Loose", "hint_select_arty": "Сначала выберите артиллерийское орудие.", "calc_target": "Цель", "calc_marker": "Метка" },
+                "es-ES": { "lang_name": "Español", "app_title": "Artillería de Mano HLL", "app_desc": "Calculadora de artilharia para Hell Let Loose", "faction_label": "Facción", "faction_us_ger": "EE.UU. y Alemania", "faction_gbr": "Gran Bretaña", "faction_ussr": "Unión Soviética", "meters_label": "Metros", "elevation_label": "Elevación (MIL)", "hotkey_info": "Usa las teclas de acceso rápido para mostrar y ajustar.", "toggle_layout_btn": "Compacto", "toggle_layout_btn_full": "Completo", "out_of_range": "Fuera de Rango", "settings_title": "Configuração", "language_section_title": "Idioma", "hotkeys_section_title": "Teclas de Acceso Rápido", "hotkey_listening": "Pulse una tecla...", "hotkey_unassigned": "Sin asignar", "tab_calculator": "Calculadora", "tab_map": "Calculadora de Mapa", "map_label": "Seleccionar Mapa", "map_alt_text": "Mapa de Hell Let Loose", "hint_select_arty": "Seleccione primero una pieza de artillería.", "calc_target": "Objetivo", "calc_marker": "Marcador" }
+            };
+            let currentLanguage = 'en-US';
+            function applyTranslations() { 
+                document.querySelectorAll('[data-i18n]').forEach(elem => { const key = elem.getAttribute('data-i18n'); if (translations[currentLanguage] && translations[currentLanguage][key]) { elem.innerHTML = translations[currentLanguage][key]; } }); 
+                document.querySelectorAll('[data-i18n-alt]').forEach(elem => { const key = elem.getAttribute('data-i18n-alt'); if (translations[currentLanguage] && translations[currentLanguage][key]) { elem.setAttribute('alt', translations[currentLanguage][key]); } });
+            }
+            return { setLanguage: (lang) => { if (translations[lang]) { currentLanguage = lang; applyTranslations(); } }, getTranslations: () => translations, getString: (key) => translations[currentLanguage][key] || key, applyTranslations, getCurrentLanguage: () => currentLanguage };
+        })();
+        
+        const GITHUB_USER = 'WeslleyH9';
+        const GITHUB_REPO = 'handheld-artillery-assets';
+
+        const MAP_DATA = [
+            { name: "Carentan", value: "carentan", image: `https://cdn.jsdelivr.net/gh/${GITHUB_USER}/${GITHUB_REPO}/img/Carentan_SP_NoHQ.png`, factions: { allies: 'USA', axis: 'Germany' }, gunPositions: { allies: [ { x: 33, y: 901 }, { x: 33, y: 910 }, { x: 33, y: 919 } ], axis: [ { x: 1870, y: 947 }, { x: 1870, y: 956 }, { x: 1870, y: 965 } ] } },
+            { name: "Driel", value: "driel", image: `https://cdn.jsdelivr.net/gh/${GITHUB_USER}/${GITHUB_REPO}/img/Driel_SP_NoHQ.png`, factions: { allies: 'GBR', axis: 'Germany' }, gunPositions: { allies: [ { x: 882, y: 1805 }, { x: 900, y: 1805 }, { x: 918, y: 1805 } ], axis: [ { x: 802, y: 142 }, { x: 819, y: 142 }, { x: 836, y: 142 } ] } },
+            { name: "El Alamein", value: "el-alamein", image: `https://cdn.jsdelivr.net/gh/${GITHUB_USER}/${GITHUB_REPO}/img/ElAlamein_SP_NoHQ.png`, factions: { allies: 'GBR', axis: 'Germany' }, gunPositions: { allies: [ { x: 1827, y: 830 }, { x: 1837, y: 864 }, { x: 1846, y: 892 } ], axis: [ { x: 49, y: 865 }, { x: 69, y: 927 }, { x: 80, y: 899 } ] } },
+            { name: "Foy", value: "foy", image: `https://cdn.jsdelivr.net/gh/${GITHUB_USER}/${GITHUB_REPO}/img/Foy_SP_NoHQ.png`, factions: { allies: 'USA', axis: 'Germany' }, gunPositions: { allies: [ { x: 1095, y: 1886 }, { x: 1103, y: 1892 }, { x: 1113, y: 1894 } ], axis: [ { x: 1010, y: 66 }, { x: 1023, y: 66 }, { x: 1036, y: 66 } ] } },
+            { name: "Hill 400", value: "hill-400", image: `https://cdn.jsdelivr.net/gh/${GITHUB_USER}/${GITHUB_REPO}/img/Hill400_SP_NoHQ.png`, factions: { allies: 'USA', axis: 'Germany' }, gunPositions: { allies: [ { x: 58, y: 1052 }, { x: 61, y: 1070 }, { x: 63, y: 1085 } ], axis: [ { x: 1813, y: 1037 }, { x: 1818, y: 1022 }, { x: 1822, y: 1011 } ] } },
+            { name: "Hürtgen Forest", value: "hurtgen-forest", image: `https://cdn.jsdelivr.net/gh/${GITHUB_USER}/${GITHUB_REPO}/img/HurtgenV2_SP_NoHQ.png`, factions: { allies: 'USA', axis: 'Germany' }, gunPositions: { allies: [ { x: 69, y: 907 }, { x: 53, y: 922 }, { x: 67, y: 932 } ], axis: [ { x: 1842, y: 1061 }, { x: 1842, y: 1068 }, { x: 1842, y: 1075 } ] } },
+            { name: "Kharkov", value: "kharkov", image: `https://cdn.jsdelivr.net/gh/${GITHUB_USER}/${GITHUB_REPO}/img/Kharkov_SP_NoHQ.png`, factions: { allies: 'USSR', axis: 'Germany' }, gunPositions: { allies: [ { x: 1020, y: 43 }, { x: 1023, y: 48 }, { x: 1033, y: 49 } ], axis: [ { x: 925, y: 1835 }, { x: 944, y: 1837 }, { x: 963, y: 1844 } ] } },
+            { name: "Kursk", value: "kursk", image: `https://cdn.jsdelivr.net/gh/${GITHUB_USER}/${GITHUB_REPO}/img/Kursk_SP_NoHQ.png`, factions: { allies: 'USSR', axis: 'Germany' }, gunPositions: { allies: [ { x: 998, y: 71 }, { x: 1006, y: 73 }, { x: 1015, y: 75 } ], axis: [ { x: 945, y: 1841 }, { x: 954, y: 1846 }, { x: 964, y: 1852 } ] } },
+            { name: "Mortain", value: "mortain", image: `https://cdn.jsdelivr.net/gh/${GITHUB_USER}/${GITHUB_REPO}/img/Mortain_SP_NoHQ.png`, factions: { allies: 'USA', axis: 'Germany' }, gunPositions: { allies: [ { x: 109, y: 888 }, { x: 109, y: 898 }, { x: 109, y: 908 } ], axis: [ { x: 1826, y: 908 }, { x: 1826, y: 921 }, { x: 1826, y: 934 } ] } },
+            { name: "Omaha Beach", value: "omaha-beach", image: `https://cdn.jsdelivr.net/gh/${GITHUB_USER}/${GITHUB_REPO}/img/Omaha_SP_NoHQ.png`, factions: { allies: 'USA', axis: 'Germany' }, gunPositions: { allies: [ { x: 1727, y: 1016 }, { x: 1715, y: 1023 }, { x: 1721, y: 1050 } ], axis: [ { x: 51, y: 954 }, { x: 52, y: 977 }, { x: 55, y: 1001 } ] } },
+            { name: "Purple Heart Lane", value: "purple-heart-lane", image: `https://cdn.jsdelivr.net/gh/${GITHUB_USER}/${GITHUB_REPO}/img/PHL_SP_NoHQ.png`, factions: { allies: 'USA', axis: 'Germany' }, gunPositions: { allies: [ { x: 947, y: 72 }, { x: 972, y: 61 }, { x: 976, y: 84 } ], axis: [ { x: 967, y: 1833 }, { x: 974, y: 1851 }, { x: 976, y: 1831 } ] } },
+            { name: "Remagen", value: "remagen", image: `https://cdn.jsdelivr.net/gh/${GITHUB_USER}/${GITHUB_REPO}/img/Remagen_SP_NoHQ.png`, factions: { allies: 'USA', axis: 'Germany' }, gunPositions: { allies: [ { x: 915, y: 1821 }, { x: 924, y: 1822 }, { x: 934, y: 1824 } ], axis: [ { x: 1097, y: 48 }, { x: 1115, y: 49 }, { x: 1133, y: 51 } ] } },
+            { name: "Sainte-Marie-du-Mont", value: "sainte-marie-du-mont", image: `https://cdn.jsdelivr.net/gh/${GITHUB_USER}/${GITHUB_REPO}/img/SMDMV2_SP_NoHQ.png`, factions: { allies: 'USA', axis: 'Germany' }, gunPositions: { allies: [ { x: 968, y: 37 }, { x: 978, y: 35 }, { x: 998, y: 36 } ], axis: [ { x: 889, y: 1888 }, { x: 905, y: 1884 }, { x: 920, y: 1879 } ] } },
+            { name: "Sainte-Mère-Église", value: "sainte-mere-eglise", image: `https://cdn.jsdelivr.net/gh/${GITHUB_USER}/${GITHUB_REPO}/img/SME_SP_NoHQ.png`, factions: { allies: 'USA', axis: 'Germany' }, gunPositions: { allies: [ { x: 1848, y: 937 }, { x: 1851, y: 951 }, { x: 1854, y: 966 } ], axis: [ { x: 38, y: 961 }, { x: 38, y: 970 }, { x: 38, y: 978 } ] } },
+            { name: "Stalingrad", value: "stalingrad", image: `https://cdn.jsdelivr.net/gh/${GITHUB_USER}/${GITHUB_REPO}/img/Stalingrad_SP_NoHQ.png`, factions: { allies: 'USSR', axis: 'Germany' }, gunPositions: { allies: [ { x: 1715, y: 991 }, { x: 1717, y: 1002 }, { x: 1716, y: 1016 } ], axis: [ { x: 51, y: 985 }, { x: 56, y: 999 }, { x: 56, y: 1016 } ] } },
+            { name: "Utah Beach", value: "utah-beach", image: `https://cdn.jsdelivr.net/gh/${GITHUB_USER}/${GITHUB_REPO}/img/Utah_SP_NoHQ.png`, factions: { allies: 'USA', axis: 'Germany' }, gunPositions: { allies: [ { x: 1713, y: 985 }, { x: 1713, y: 1004 }, { x: 1713, y: 1023 } ], axis: [ { x: 73, y: 944 }, { x: 73, y: 953 }, { x: 73, y: 963 } ] } }
+        ];
+
+        const ArtilleryCalculator = (() => {
+            const data = { gbr: [[100,533],[105,532.1],[110,531.2],[115,530.3],[120,529.5],[125,528.6],[130,527.7],[135,526.8],[140,525.9],[145,525],[150,524.1],[155,523.2],[160,522.4],[165,521.5],[170,520.6],[175,519.7],[180,518.8],[185,517.9],[190,517],[195,516.2],[200,515.3],[205,514.4],[210,513.5],[215,512.6],[220,511.7],[225,510.8],[230,509.9],[235,509.1],[240,508.2],[245,507.3],[250,506.4],[255,505.5],[260,504.6],[265,503.7],[270,502.9],[275,502],[280,501.1],[285,500.2],[290,499.3],[295,498.4],[300,497.5],[305,496.6],[310,495.8],[315,494.9],[320,494],[325,493.1],[330,492.2],[335,491.3],[340,490.4],[345,489.6],[350,488.7],[355,487.8],[360,486.9],[365,486],[370,485.1],[375,484.2],[380,483.3],[385,482.5],[390,481.6],[395,480.7],[400,479.8],[405,478.9],[410,478],[415,477.1],[420,476.3],[425,475.4],[430,474.5],[435,473.6],[440,472.7],[445,471.8],[450,470.9],[455,470],[460,469.2],[465,468.3],[470,467.4],[475,466.5],[480,465.6],[485,464.7],[490,463.8],[495,463],[500,462.1],[505,461.2],[510,460.3],[515,459.4],[520,458.5],[525,457.6],[530,456.7],[535,455.9],[540,455],[545,454.1],[550,453.2],[555,452.3],[560,451.4],[565,450.5],[570,449.7],[575,448.8],[580,447.9],[585,447],[590,446.1],[595,445.2],[600,444.3],[605,443.4],[610,442.6],[615,441.7],[620,440.8],[625,439.9],[630,439],[635,438.1],[640,437.2],[645,436.4],[650,435.5],[655,434.6],[660,433.7],[665,432.8],[670,431.9],[675,431],[680,430.1],[685,429.3],[690,428.4],[695,427.5],[700,426.6],[705,425.7],[710,424.8],[715,423.9],[720,423.1],[725,422.2],[730,421.3],[735,420.4],[740,419.5],[745,418.6],[750,417.7],[755,416.8],[760,416],[765,415.1],[770,414.2],[775,413.3],[780,412.4],[785,411.5],[790,410.6],[795,409.8],[800,408.9],[805,408],[810,407.1],[815,406.2],[820,405.3],[825,404.4],[830,403.5],[835,402.7],[840,401.8],[845,400.9],[850,400],[855,399.1],[860,398.2],[865,397.3],[870,396.5],[875,395.6],[880,394.7],[885,393.8],[890,392.9],[895,392],[900,391.1],[905,390.2],[910,389.4],[915,388.5],[920,387.6],[925,386.7],[930,385.8],[935,384.9],[940,384],[945,383.2],[950,382.3],[955,381.4],[960,380.5],[965,379.6],[970,378.7],[975,377.8],[980,376.9],[985,376.1],[990,375.2],[995,374.3],[1000,373.4],[1005,372.5],[1010,371.6],[1015,370.7],[1020,369.9],[1025,369],[1030,368.1],[1035,367.2],[1040,366.3],[1045,365.4],[1050,364.5],[1055,363.6],[1060,362.8],[1065,361.9],[1070,361],[1075,360.1],[1080,359.2],[1085,358.3],[1090,357.4],[1095,356.6],[1100,355.7],[1105,354.8],[1110,353.9],[1115,353],[1120,352.1],[1125,351.2],[1130,350.3],[1135,349.5],[1140,348.6],[1145,347.7],[1150,346.8],[1155,345.9],[1160,345],[1165,344.1],[1170,343.3],[1175,342.4],[1180,341.5],[1185,340.6],[1190,339.7],[1195,338.8],[1200,337.9],[1205,337],[1210,336.2],[1215,335.3],[1220,334.4],[1225,333.5],[1230,332.6],[1235,331.7],[1240,330.8],[1245,330],[1250,329.1],[1255,328.2],[1260,327.3],[1265,326.4],[1270,325.5],[1275,324.6],[1280,323.7],[1285,322.9],[1290,322],[1295,321.1],[1300,320.2],[1305,319.3],[1310,318.4],[1315,317.5],[1320,316.7],[1325,315.8],[1330,314.9],[1335,314],[1340,313.1],[1345,312.2],[1350,311.3],[1355,310.4],[1360,309.6],[1365,308.7],[1370,307.8],[1375,306.9],[1380,306],[1385,305.1],[1390,304.2],[1395,303.4],[1400,302.5],[1405,301.6],[1410,300.7],[1415,299.8],[1420,298.9],[1425,298],[1430,297.1],[1435,296.3],[1440,295.4],[1445,294.5],[1450,293.6],[1455,292.7],[1460,291.8],[1465,290.9],[1470,290.1],[1475,289.2],[1480,288.3],[1485,287.4],[1490,286.5],[1495,285.6],[1500,284.7],[1505,283.8],[1510,283],[1515,282.1],[1520,281.2],[1525,280.3],[1530,279.4],[1535,278.5],[1540,277.6],[1545,276.8],[1550,275.9],[1555,275],[1560,274.1],[1565,273.2],[1570,272.3],[1575,271.4],[1580,270.5],[1585,269.7],[1590,268.8],[1595,267.9],[1600,267]], ussr: [[100,1126],[105,1119],[110,1113.8],[115,1111.5],[120,1111.3],[125,1111.1],[130,1111.6],[135,1112.6],[140,1111.5],[145,1110.4],[150,1109.4],[155,1108.3],[160,1107.2],[165,1106.2],[170,1105.1],[175,1104.0],[180,1103.0],[185,1101.9],[190,1100.8],[195,1099.8],[200,1098.7],[205,1097.6],[210,1096.5],[215,1095.5],[220,1094.4],[225,1093.4],[230,1092.3],[235,1091.2],[240,1090.2],[245,1089.1],[250,1088],[255,1087],[260,1085.9],[265,1084.8],[270,1083.7],[275,1082.7],[280,1081.6],[285,1080.6],[290,1079.5],[295,1078.4],[300,1077.4],[305,1076.3],[310,1075.2],[315,1074.2],[320,1073.1],[325,1072.0],[330,1071.0],[335,1069.9],[340,1068.8],[345,1067.8],[350,1066.7],[355,1065.6],[360,1064.6],[365,1063.5],[370,1062.4],[375,1061.4],[380,1060.3],[385,1059.2],[390,1058.2],[395,1057.2],[400,1056],[405,1055.0],[410,1053.9],[415,1052.8],[420,1051.8],[425,1050.7],[430,1049.6],[435,1048.6],[440,1047.5],[445,1046.4],[450,1045.4],[455,1044.3],[460,1043.2],[465,1042.2],[470,1041.1],[475,1040.0],[480,1039.0],[485,1037.9],[490,1036.8],[495,1035.8],[500,1034.7],[550,1024.0],[555,1022.9],[560,1021.9],[565,1020.8],[570,1019.7],[575,1018.7],[580,1017.6],[585,1016.5],[590,1015.5],[595,1014.4],[600,1013.3],[605,1012.3],[610,1011.2],[615,1010.1],[620,1009.1],[625,1008.0],[630,1006.9],[635,1005.9],[640,1004.8],[645,1003.7],[650,1002.7],[655,1001.6],[660,1000.5],[665,999.5],[670,998.4],[675,997.3],[680,996.3],[685,995.2],[690,994.1],[695,993.1],[700,992.0],[705,990.9],[710,989.9],[715,988.8],[720,987.7],[725,986.7],[730,985.6],[735,984.5],[740,983.5],[745,982.4],[750,981.3],[755,980.3],[760,979.2],[765,978.1],[770,977.1],[775,976.0],[780,974.9],[785,973.9],[790,972.8],[795,971.7],[800,970.7],[805,969.6],[810,968.5],[815,967.5],[820,966.4],[825,965.3],[830,964.3],[835,963.2],[840,962.1],[845,961.1],[850,960.0],[855,958.9],[860,957.9],[865,956.8],[870,955.7],[875,954.7],[880,953.6],[885,952.5],[890,951.5],[895,950.4],[900,949.3],[905,948.3],[910,947.2],[915,946.1],[920,945.1],[925,944.0],[930,942.9],[935,941.9],[940,940.8],[945,939.8],[950,938.7],[955,937.6],[960,936.6],[965,935.5],[970,934.4],[975,933.4],[980,932.3],[985,931.2],[990,930.1],[995,929.1],[1000,928.0],[1005,926.9],[1010,925.9],[1015,924.8],[1020,923.7],[1025,922.7],[1030,921.6],[1035,920.5],[1040,919.5],[1045,918.4],[1050,917.3],[1055,916.3],[1060,915.2],[1065,914.2],[1070,913.1],[1075,912.0],[1080,910.9],[1085,909.9],[1090,908.8],[1095,907.7],[1100,906.7],[1105,905.6],[1110,904.5],[1115,903.5],[1120,902.4],[1125,901.3],[1130,900.3],[1135,899.2],[1140,898.1],[1145,897.1],[1150,896.0],[1155,894.9],[1160,893.9],[1165,892.8],[1170,891.7],[1175,890.7],[1180,889.6],[1185,888.5],[1190,887.5],[1195,886.4],[1200,885.3],[1205,884.3],[1210,883.2],[1215,882.1],[1220,881.1],[1225,880.0],[1230,878.9],[1235,877.9],[1240,876.8],[1245,875.7],[1250,874.7],[1255,873.6],[1260,872.5],[1265,871.5],[1270,870.4],[1275,869.3],[1280,868.3],[1285,867.2],[1290,866.1],[1295,865.1],[1300,864.0],[1305,862.9],[1310,861.8],[1315,860.8],[1320,859.7],[1325,858.6],[1330,857.5],[1335,856.5],[1340,855.4],[1345,854.4],[1350,853.3],[1355,852.2],[1360,851.2],[1365,850.1],[1370,849.0],[1375,848.0],[1380,846.9],[1385,845.8],[1390,844.8],[1395,843.7],[1400,842.6],[1405,841.6],[1410,840.5],[1415,839.4],[1420,838.4],[1425,837.3],[1430,836.2],[1435,835.2],[1440,834.1],[1445,833.0],[1450,832.0],[1455,830.9],[1460,829.8],[1465,828.8],[1470,827.7],[1475,826.6],[1480,825.6],[1485,824.5],[1490,823.4],[1495,822.4],[1500,821.3],[1505,820.2],[1510,819.2],[1515,818.1],[1520,817.0],[1525,816.0],[1530,814.9],[1535,813.8],[1540,812.8],[1545,811.7],[1550,810.6],[1555,809.6],[1560,808.5],[1565,807.4],[1570,806.4],[1575,805.3],[1580,804.2],[1585,803.2],[1590,802.1],[1595,801.0],[1600,800.0]], usa_ger: [[100,977.8],[105,976.6],[110,975.4],[115,974.3],[120,973.1],[125,971.9],[130,970.7],[135,969.5],[140,968.3],[145,967.1],[150,966],[155,964.8],[160,963.6],[165,962.4],[170,961.2],[175,960],[180,958.9],[185,957.7],[190,956.5],[195,955.3],[200,954.1],[205,952.9],[210,951.7],[215,950.6],[220,949.4],[225,948.2],[230,947],[235,945.8],[240,944.6],[245,943.4],[250,942.3],[255,941.1],[260,939.9],[265,938.7],[270,937.5],[275,936.3],[280,935.1],[285,934],[290,932.8],[295,931.6],[300,930.4],[305,929.2],[310,928],[315,926.8],[320,925.7],[325,924.5],[330,923.3],[335,922.1],[340,920.9],[345,919.7],[350,918.5],[355,917.4],[360,916.2],[365,915],[370,913.8],[375,912.6],[380,911.4],[385,910.2],[390,909.1],[395,907.9],[400,906.7],[405,905.5],[410,904.3],[415,903.1],[420,901.9],[425,900.8],[430,899.6],[435,898.4],[440,897.2],[445,896],[450,894.8],[455,893.7],[460,892.5],[465,891.3],[470,890.1],[475,888.9],[480,887.7],[485,886.5],[490,885.4],[495,884.2],[500,883],[550,871.1],[555,869.9],[560,868.8],[565,867.6],[570,866.4],[575,865.2],[580,864],[585,862.8],[590,861.6],[595,860.5],[600,859.3],[605,858.1],[610,856.9],[615,855.7],[620,854.5],[625,853.3],[630,852.2],[635,851],[640,849.8],[645,848.6],[650,847.4],[655,846.2],[660,845],[665,843.9],[670,842.7],[675,841.5],[680,840.3],[685,839.1],[690,837.9],[695,836.7],[700,835.6],[705,834.4],[710,833.2],[715,832],[720,830.8],[725,829.6],[730,828.5],[735,827.3],[740,826.1],[745,824.9],[750,823.7],[755,822.5],[760,821.3],[765,820.2],[770,819],[775,817.8],[780,816.6],[785,815.4],[790,814.2],[795,813],[800,811.9],[805,810.7],[810,809.5],[815,808.3],[820,807.1],[825,805.9],[830,804.7],[835,803.6],[840,802.4],[845,801.2],[850,800],[855,798.8],[860,797.6],[865,796.4],[870,795.3],[875,794.1],[880,792.9],[885,791.7],[890,790.5],[895,789.3],[900,788.1],[905,787],[910,785.8],[915,784.6],[920,783.4],[925,782.2],[930,781],[935,779.8],[940,778.7],[945,777.5],[950,776.3],[955,775.1],[960,773.9],[965,772.7],[970,771.5],[975,770.4],[980,769.2],[985,768],[990,766.8],[995,765.6],[1000,764.4],[1005,763.3],[1010,762.1],[1015,760.9],[1020,759.7],[1025,758.5],[1030,757.3],[1035,756.1],[1040,755],[1045,753.8],[1050,752.6],[1055,751.4],[1060,750.2],[1065,749],[1070,747.8],[1075,746.7],[1080,745.5],[1085,744.3],[1090,743.1],[1095,741.9],[1100,740.7],[1105,739.5],[1110,738.4],[1115,737.2],[1120,736],[1125,734.8],[1130,733.6],[1135,732.4],[1140,731.2],[1145,730.1],[1150,728.9],[1155,727.7],[1160,726.5],[1165,725.3],[1170,724.1],[1175,722.9],[1180,721.8],[1185,720.6],[1190,719.4],[1195,718.2],[1200,717],[1205,715.8],[1210,714.6],[1215,713.5],[1220,712.3],[1225,711.1],[1230,709.9],[1235,708.7],[1240,707.5],[1245,706.3],[1250,705.2],[1255,704],[1260,702.8],[1265,701.6],[1270,700.4],[1275,699.2],[1280,698.1],[1285,696.9],[1290,695.7],[1300,693.3],[1305,692.1],[1310,690.9],[1315,689.8],[1320,688.6],[1325,687.4],[1330,686.2],[1335,685.0],[1340,683.8],[1345,682.6],[1350,681.5],[1355,680.3],[1360,679.1],[1365,677.9],[1370,676.7],[1375,675.5],[1380,674.3],[1385,673.2],[1390,672.0],[1395,670.8],[1400,669.6],[1405,668.4],[1410,667.2],[1415,666.0],[1420,664.9],[1425,663.7],[1430,662.5],[1435,661.3],[1440,660.1],[1445,658.9],[1450,657.7],[1455,656.6],[1460,655.4],[1465,654.2],[1470,653.0],[1475,651.8],[1480,650.6],[1485,649.4],[1490,648.3],[1495,647.1],[1500,645.9],[1505,644.7],[1510,643.5],[1515,642.3],[1520,641.2],[1525,640.0],[1530,638.8],[1535,637.6],[1540,636.4],[1545,635.2],[1550,634.0],[1555,632.9],[1560,631.7],[1565,630.5],[1570,629.3],[1575,628.1],[1580,626.9],[1585,625.7],[1590,624.6],[1595,623.4],[1600,622.2]] };
+            function calculate(faction, distance) {
+                const table = data[faction];
+                if (!table) return null;
+                const dist = parseInt(distance, 10);
+                if (isNaN(dist)) return null;
+                let lower = null, upper = null;
+                for (const point of table) { if (point[0] === dist) return Math.round(point[1]).toString(); if (point[0] < dist) lower = point; if (point[0] > dist && !upper) { upper = point; break; } }
+                if (!lower || !upper) return I18n.getString('out_of_range');
+                const rangeDiff = upper[0] - lower[0]; const milDiff = upper[1] - lower[1]; const distanceRatio = (dist - lower[0]) / rangeDiff; const interpolatedMil = lower[1] + (milDiff * distanceRatio);
+                return Math.round(interpolatedMil).toString();
+            }
+            return { calculate };
+        })();
+
+        class AppController {
+            constructor() {
+                this.isCompact = false;
+                this.currentMeters = 100;
+                this.ad400x60 = null;
+                this.ad400x300 = null;
+                
+                this.elements = {
+                    appContainer: document.getElementById('app-container'),
+                    header: document.getElementById('header'),
+                    factionSelect: document.getElementById('faction-select'),
+                    metersInput: document.getElementById('meters-input'),
+                    elevationOutput: document.getElementById('elevation-output'),
+                    toggleLayoutButton: document.getElementById('toggle-layout-button'),
+                    footer: document.querySelector('.footer'),
+                    minimizeButton: document.getElementById('minimize-btn'),
+                    closeButton: document.getElementById('close-btn'),
+                    
+                    settingsButton: document.getElementById('settings-btn'),
+                    settingsModal: document.getElementById('settings-modal'),
+                    settingsCloseButton: document.getElementById('settings-close-btn'),
+                    languageSelect: document.getElementById('language-select-settings'),
+                    hotkeysContainer: document.getElementById('hotkeys-container'),
+
+                    tabCalculator: document.getElementById('tab-calculator'),
+                    tabMap: document.getElementById('tab-map'),
+                    calculatorContent: document.getElementById('calculator-content'),
+                    mapContent: document.getElementById('map-content'),
+                    mapSelect: document.getElementById('map-select'),
+                    mapImage: document.getElementById('map-image'),
+                    mapDisplayContainer: document.getElementById('map-display-container'),
+                    mapTransformContainer: document.getElementById('map-transform-container'),
+                    mapElevationDisplay: document.getElementById('map-elevation-display'),
+                    mapHintDisplay: document.getElementById('map-hint-display')
+                };
+
+                 this.mapState = {
+                    artilleryPos: null,
+                    targetPos: null,
+                    greenMarkerPos: null,
+                    greenMarkerVisible: false,
+                    mapScale: 0.95,
+                    mapReferenceResolution: 1920,
+                    selectedArtyIcon: null,
+                    targetIcon: null,
+                    greenMarkerIcon: null,
+                    zoomLevel: 1,
+                    minZoom: 1,
+                    maxZoom: 8,
+                    compactMaxZoom: 16,
+                    mapPosition: { x: 0, y: 0 },
+                    isPanning: false,
+                    panStart: { x: 0, y: 0 },
+                    clickThreshold: 5
+                };
+
+                this.dragService = new DragService(this.elements.header, this.elements.footer, document.querySelector('.settings-header'));
+            }
+
+            init() {
+                this.dragService.run();
+                
+                const savedLang = localStorage.getItem('hllArtilleryLanguage') || 'en-US';
+                this.changeLanguage(savedLang);
+                this.populateLanguages();
+                this.populateHotkeys();
+                this.populateMaps(); 
+                this.displaySelectedMap();
+                this.initAds();
+
+                this.elements.factionSelect.addEventListener('change', () => this.updateCalculation());
+                this.elements.metersInput.addEventListener('input', () => this.handleMetersInput());
+                this.elements.metersInput.addEventListener('blur', () => this.validateMetersInputOnBlur());
+                this.elements.metersInput.addEventListener('wheel', (e) => this.handleMouseWheel(e));
+                this.elements.toggleLayoutButton.addEventListener('click', () => this.toggleLayout());
+                this.elements.minimizeButton.addEventListener('click', () => this.minimizeWindow());
+                this.elements.closeButton.addEventListener('click', () => this.closeWindow());
+                
+                this.elements.settingsButton.addEventListener('click', () => this.openSettings());
+                this.elements.settingsCloseButton.addEventListener('click', () => this.closeSettings());
+                this.elements.settingsModal.addEventListener('click', (e) => {
+                     if (e.target === this.elements.settingsModal) { this.closeSettings(); }
+                });
+                this.elements.languageSelect.addEventListener('change', (e) => this.changeLanguage(e.target.value));
+
+                this.elements.tabCalculator.addEventListener('click', () => this.switchTab('calculator'));
+                this.elements.tabMap.addEventListener('click', () => this.switchTab('map'));
+                
+                this.elements.mapSelect.addEventListener('change', () => {
+                    this.displaySelectedMap();
+                });
+                
+                this.elements.mapDisplayContainer.addEventListener('wheel', (e) => this.handleZoom(e));
+                this.elements.mapDisplayContainer.addEventListener('mousedown', (e) => this.handleMouseDown(e));
+                window.addEventListener('mousemove', (e) => this.handlePanMove(e));
+                window.addEventListener('mouseup', (e) => this.handleMouseUp(e));
+                this.elements.mapDisplayContainer.addEventListener('contextmenu', (e) => this.handleRightClick(e));
+
+                overwolf.windows.onMessageReceived.addListener((message) => {
+                    if (message.id === 'update_meters' && message.content && typeof message.content.step === 'number') {
+                        this.adjustMeters(message.content.step);
+                    }
+                    if (message.id === 'hotkey_changed') {
+                        this.populateHotkeys();
+                    }
+                });
+
+                overwolf.windows.getCurrentWindow(result => {
+                    if (result.success) {
+                        overwolf.windows.onWindowClosing.addListener(result.window.id, () => {
+                            if (this.ad400x60) this.ad400x60.shutdown();
+                            if (this.ad400x300) this.ad400x300.shutdown();
+                        });
+                    }
+                });
+                
+                this.updateCalculation();
+            }
+
+                        initAds() {
+                const adContainer60 = document.getElementById('ad-container-400x60');
+                const adContainer300 = document.getElementById('ad-container-400x300');
+
+                // CORREÇÃO: Função para abrir o link do anúncio no navegador padrão.
+                const handleAdClick = (event) => {
+                    overwolf.utils.openUrlInDefaultBrowser(event.url);
+                };
+
+                if (adContainer60) {
+                    this.ad400x60 = new OwAd(adContainer60, {
+                        size: { width: 400, height: 60 }
+                    });
+                    // CORREÇÃO: Atribui o manipulador de clique ao evento do anúncio.
+                    this.ad400x60.onAdClicked = handleAdClick;
+                }
+
+                if (adContainer300) {
+                    this.ad400x300 = new OwAd(adContainer300, {
+                        size: { width: 400, height: 300 }
+                    });
+                    // CORREÇÃO: Atribui o manipulador de clique ao evento do anúncio.
+                    this.ad400x300.onAdClicked = handleAdClick;
+                }
+
+                overwolf.windows.onMainWindowRestored.addListener(() => {
+                    if (this.ad400x60) this.ad400x60.refreshAd();
+                    if (this.ad400x300) this.ad400x300.refreshAd();
+                });
+            }
+
+            showMapHint(message) {
+                const hintElement = this.elements.mapHintDisplay;
+                hintElement.textContent = message;
+                hintElement.style.display = 'block';
+
+                setTimeout(() => {
+                    hintElement.style.display = 'none';
+                }, 3000);
+            }
+            
+            applyTransform() {
+                const { x, y } = this.mapState.mapPosition;
+                const scale = this.mapState.zoomLevel;
+                this.elements.mapTransformContainer.style.transform = `translate(${x}px, ${y}px) scale(${scale})`;
+                
+                const invScale = 1 / scale;
+                this.elements.mapTransformContainer.querySelectorAll('.map-icon').forEach(icon => {
+                    icon.style.transform = `translate(-50%, -50%) scale(${invScale})`;
+                });
+            }
+
+            clampMapPosition() {
+                const { mapPosition, zoomLevel } = this.mapState;
+                const container = this.elements.mapDisplayContainer;
+                const containerWidth = container.clientWidth;
+                const containerHeight = container.clientHeight;
+
+                const scaledWidth = containerWidth * zoomLevel;
+                const scaledHeight = containerHeight * zoomLevel;
+
+                mapPosition.x = Math.max(containerWidth - scaledWidth, Math.min(0, mapPosition.x));
+                mapPosition.y = Math.max(containerHeight - scaledHeight, Math.min(0, mapPosition.y));
+            }
+
+            handleZoom(event) {
+                event.preventDefault();
+                const zoomFactor = 1.1;
+                const maxZoom = this.isCompact ? this.mapState.compactMaxZoom : this.mapState.maxZoom;
+                const { minZoom } = this.mapState;
+                const rect = this.elements.mapDisplayContainer.getBoundingClientRect();
+
+                const mouseX = event.clientX - rect.left;
+                const mouseY = event.clientY - rect.top;
+
+                const oldZoom = this.mapState.zoomLevel;
+                let newZoom = event.deltaY < 0 ? oldZoom * zoomFactor : oldZoom / zoomFactor;
+                newZoom = Math.max(minZoom, Math.min(maxZoom, newZoom));
+
+                if (newZoom === oldZoom) return;
+
+                const oldMapPos = this.mapState.mapPosition;
+                this.mapState.mapPosition.x = mouseX - (mouseX - oldMapPos.x) * (newZoom / oldZoom);
+                this.mapState.mapPosition.y = mouseY - (mouseY - oldMapPos.y) * (newZoom / oldZoom);
+                this.mapState.zoomLevel = newZoom;
+                
+                this.clampMapPosition();
+                this.applyTransform();
+            }
+            
+            handleMouseDown(event) {
+                if (event.button === 0) {
+                    this.handlePanStart(event);
+                }
+            }
+
+            handlePanStart(event) {
+                if (event.target.classList.contains('arty-icon')) return;
+                
+                event.preventDefault();
+                this.mapState.isPanning = true;
+                this.mapState.panStart = { x: event.clientX, y: event.clientY, moved: false };
+            }
+
+            handlePanMove(event) {
+                if (!this.mapState.isPanning) return;
+                
+                event.preventDefault();
+                const dx = event.clientX - this.mapState.panStart.x;
+                const dy = event.clientY - this.mapState.panStart.y;
+
+                if (!this.mapState.panStart.moved && (Math.abs(dx) > this.mapState.clickThreshold || Math.abs(dy) > this.mapState.clickThreshold)) {
+                    this.mapState.panStart.moved = true;
+                }
+
+                this.mapState.mapPosition.x += dx;
+                this.mapState.mapPosition.y += dy;
+                
+                this.clampMapPosition();
+                this.applyTransform();
+                
+                this.mapState.panStart.x = event.clientX;
+                this.mapState.panStart.y = event.clientY;
+            }
+
+            handleMouseUp(event) {
+                if (!this.mapState.isPanning) return;
+                
+                this.mapState.isPanning = false;
+
+                if (!this.mapState.panStart.moved) {
+                    this.handleMapClick(event);
+                }
+            }
+
+            handleRightClick(event) {
+                event.preventDefault();
+                
+                if (this.mapState.greenMarkerIcon && this.mapState.greenMarkerVisible) {
+                    this.mapState.greenMarkerIcon.style.display = 'none';
+                    this.mapState.greenMarkerVisible = false;
+                    this.updateElevationDisplay();
+                    return;
+                }
+                
+                if (!this.mapState.artilleryPos) {
+                    this.showMapHint(I18n.getString('hint_select_arty'));
+                    return;
+                }
+
+                const rect = this.elements.mapDisplayContainer.getBoundingClientRect();
+                const refRes = this.mapState.mapReferenceResolution;
+                
+                const clickX_viewport = event.clientX - rect.left;
+                const clickY_viewport = event.clientY - rect.top;
+
+                const mapX = (clickX_viewport - this.mapState.mapPosition.x) / this.mapState.zoomLevel;
+                const mapY = (clickY_viewport - this.mapState.mapPosition.y) / this.mapState.zoomLevel;
+                
+                this.mapState.greenMarkerPos = {
+                    x_abs: (mapX / rect.width) * refRes,
+                    y_abs: (mapY / rect.height) * refRes,
+                    x_disp_percent: (mapX / rect.width) * 100,
+                    y_disp_percent: (mapY / rect.height) * 100
+                };
+
+                this.updateGreenMarkerIcon();
+                this.mapState.greenMarkerVisible = true;
+                this.updateElevationDisplay();
+            }
+
+            updateGreenMarkerIcon() {
+                if (!this.mapState.greenMarkerIcon) {
+                    this.mapState.greenMarkerIcon = document.createElement('div');
+                    this.mapState.greenMarkerIcon.className = 'map-icon green-marker-icon';
+                    this.elements.mapTransformContainer.appendChild(this.mapState.greenMarkerIcon);
+                }
+                this.mapState.greenMarkerIcon.style.left = `${this.mapState.greenMarkerPos.x_disp_percent}%`;
+                this.mapState.greenMarkerIcon.style.top = `${this.mapState.greenMarkerPos.y_disp_percent}%`;
+                this.mapState.greenMarkerIcon.style.display = 'block';
+                this.applyTransform();
+            }
+            
+            createMapIcons() {
+                this.resetMapState();
+                const mapInfo = MAP_DATA.find(map => map.value === this.elements.mapSelect.value);
+                const refRes = this.mapState.mapReferenceResolution;
+
+                if (mapInfo && mapInfo.gunPositions) {
+                    if (mapInfo.gunPositions.allies) {
+                        mapInfo.gunPositions.allies.forEach((pos) => {
+                            this.renderArtyIcon(pos, 'allies');
+                        });
+                    }
+                    if (mapInfo.gunPositions.axis) {
+                        mapInfo.gunPositions.axis.forEach((pos) => {
+                            this.renderArtyIcon(pos, 'axis');
+                        });
+                    }
+                }
+                this.applyTransform();
+            }
+
+            renderArtyIcon(pos, side) {
+                const refRes = this.mapState.mapReferenceResolution;
+                const icon = document.createElement('div');
+                icon.className = `map-icon arty-icon ${side}`;
+                
+                icon.style.left = `${(pos.x / refRes) * 100}%`;
+                icon.style.top = `${(pos.y / refRes) * 100}%`;
+
+                icon.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.selectArtilleryPosition(pos, icon);
+                });
+
+                this.elements.mapTransformContainer.appendChild(icon);
+            }
+
+            selectArtilleryPosition(pos, clickedIcon) {
+                this.mapState.artilleryPos = { x: pos.x, y: pos.y };
+
+                if (this.mapState.selectedArtyIcon) {
+                    this.mapState.selectedArtyIcon.classList.remove('selected');
+                }
+                clickedIcon.classList.add('selected');
+                this.mapState.selectedArtyIcon = clickedIcon;
+
+                if (this.mapState.targetPos) {
+                    this.updateElevationDisplay();
+                }
+                if (this.mapState.greenMarkerPos) {
+                    this.updateElevationDisplay();
+                }
+            }
+
+            handleMapClick(event) {
+                if (!this.mapState.artilleryPos) {
+                    this.showMapHint(I18n.getString('hint_select_arty'));
+                    return;
+                }
+
+                const rect = this.elements.mapDisplayContainer.getBoundingClientRect();
+                const refRes = this.mapState.mapReferenceResolution;
+                
+                const clickX_viewport = event.clientX - rect.left;
+                const clickY_viewport = event.clientY - rect.top;
+
+                const mapX = (clickX_viewport - this.mapState.mapPosition.x) / this.mapState.zoomLevel;
+                const mapY = (clickY_viewport - this.mapState.mapPosition.y) / this.mapState.zoomLevel;
+                
+                this.mapState.targetPos = {
+                    x_abs: (mapX / rect.width) * refRes,
+                    y_abs: (mapY / rect.height) * refRes,
+                    x_disp_percent: (mapX / rect.width) * 100,
+                    y_disp_percent: (mapY / rect.height) * 100
+                };
+
+                this.updateTargetIcon();
+                this.updateElevationDisplay();
+            }
+            
+            updateTargetIcon() {
+                if (!this.mapState.targetIcon) {
+                    this.mapState.targetIcon = document.createElement('div');
+                    this.mapState.targetIcon.className = 'map-icon target-icon';
+                    this.elements.mapTransformContainer.appendChild(this.mapState.targetIcon);
+                }
+                this.mapState.targetIcon.style.left = `${this.mapState.targetPos.x_disp_percent}%`;
+                this.mapState.targetIcon.style.top = `${this.mapState.targetPos.y_disp_percent}%`;
+                this.mapState.targetIcon.style.display = 'block';
+                this.applyTransform();
+            }
+             
+            updateElevationDisplay() {
+                const displayText = [];
+                
+                if (this.mapState.targetPos) {
+                    const elevation = this.calculateElevationForPoint(this.mapState.targetPos);
+                    displayText.push(`${I18n.getString('calc_target')}: ${elevation} MIL`);
+                }
+
+                if (this.mapState.greenMarkerPos && this.mapState.greenMarkerVisible) {
+                    const elevation = this.calculateElevationForPoint(this.mapState.greenMarkerPos);
+                    displayText.push(`${I18n.getString('calc_marker')}: ${elevation} MIL`);
+                }
+                
+                if (displayText.length > 0) {
+                    this.elements.mapElevationDisplay.innerHTML = displayText.join('<br>');
+                    this.elements.mapElevationDisplay.style.display = 'block';
+                } else {
+                    this.elements.mapElevationDisplay.style.display = 'none';
+                }
+            }
+
+            calculateElevationForPoint(point) {
+                if (!this.mapState.artilleryPos || !this.mapState.selectedArtyIcon) return '...';
+                
+                const art = this.mapState.artilleryPos;
+                const tgt = point;
+
+                const deltaX_pixels = Math.abs(art.x - tgt.x_abs);
+                const deltaY_pixels = Math.abs(art.y - tgt.y_abs);
+
+                const distanceInMeters = Math.sqrt(Math.pow(deltaX_pixels, 2) + Math.pow(deltaY_pixels, 2)) * this.mapState.mapScale;
+                
+                const mapInfo = MAP_DATA.find(map => map.value === this.elements.mapSelect.value);
+                let factionKey = 'usa_ger';
+
+                if (mapInfo) {
+                    if (this.mapState.selectedArtyIcon.classList.contains('axis')) {
+                        const axisFaction = mapInfo.factions.axis;
+                        if (axisFaction === 'Germany') factionKey = 'usa_ger';
+                    } else {
+                        const alliesFaction = mapInfo.factions.allies;
+                        if (alliesFaction === 'GBR') factionKey = 'gbr';
+                        else if (alliesFaction === 'USSR') factionKey = 'ussr';
+                        else factionKey = 'usa_ger';
+                    }
+                }
+
+                return ArtilleryCalculator.calculate(factionKey, distanceInMeters.toFixed(0));
+            }
+
+            calculateMapDistance() {
+                this.updateElevationDisplay();
+            }
+
+            resetMapState() {
+                this.elements.mapTransformContainer.innerHTML = '';
+                this.elements.mapTransformContainer.appendChild(this.elements.mapImage);
+                if(this.elements.mapElevationDisplay) this.elements.mapElevationDisplay.style.display = 'none';
+                
+                this.mapState.artilleryPos = null;
+                this.mapState.targetPos = null;
+                this.mapState.greenMarkerPos = null;
+                this.mapState.greenMarkerVisible = false;
+                this.mapState.selectedArtyIcon = null;
+                this.mapState.targetIcon = null;
+                this.mapState.greenMarkerIcon = null;
+                this.mapState.zoomLevel = 1;
+                this.mapState.mapPosition = { x: 0, y: 0 };
+                this.applyTransform();
+            }
+
+            switchTab(tabName) {
+                if (tabName === 'calculator') {
+                    this.elements.calculatorContent.style.display = 'block';
+                    this.elements.mapContent.style.display = 'none';
+                    this.elements.tabCalculator.classList.add('active');
+                    this.elements.tabMap.classList.remove('active');
+                } else if (tabName === 'map') {
+                    this.elements.calculatorContent.style.display = 'none';
+                    this.elements.mapContent.style.display = 'block';
+                    this.elements.tabCalculator.classList.remove('active');
+                    this.elements.tabMap.classList.add('active');
+                }
+            }
+
+            populateMaps() {
+                const select = this.elements.mapSelect;
+                select.innerHTML = '';
+                MAP_DATA.forEach(map => {
+                    const option = document.createElement('option');
+                    option.value = map.value;
+                    option.textContent = map.name;
+                    select.appendChild(option);
+                });
+                select.value = 'carentan';
+            }
+
+            displaySelectedMap() {
+                const selectedMapValue = this.elements.mapSelect.value;
+                const mapData = MAP_DATA.find(map => map.value === selectedMapValue);
+                if (mapData) {
+                    this.elements.mapImage.src = mapData.image;
+                    this.elements.mapImage.onload = () => {
+                       this.createMapIcons();
+                    }
+                }
+            }
+            
+            minimizeWindow() { overwolf.windows.getCurrentWindow(result => { if (result.success) { overwolf.windows.minimize(result.window.id); } }); }
+            closeWindow() { overwolf.windows.getCurrentWindow(result => { if (result.success) { overwolf.windows.hide(result.window.id); } }); }
+            openSettings() { this.elements.settingsModal.style.display = 'flex'; }
+            closeSettings() { this.elements.settingsModal.style.display = 'none'; }
+            
+            populateLanguages() {
+                const languages = I18n.getTranslations();
+                const select = this.elements.languageSelect;
+                select.innerHTML = '';
+                for (const langCode in languages) {
+                    const lang = languages[langCode];
+                    const option = document.createElement('option');
+                    option.value = langCode;
+                    option.textContent = lang.lang_name;
+                    select.appendChild(option);
+                }
+                select.value = I18n.getCurrentLanguage();
+            }
+
+            populateHotkeys() {
+                overwolf.settings.hotkeys.get((result) => {
+                    if (result.success && result.games) {
+                        const gameHotkeys = result.games['22134'];
+                        if (gameHotkeys) {
+                            this.elements.hotkeysContainer.innerHTML = '';
+                            for (const hotkey of gameHotkeys) {
+                                const itemDiv = document.createElement('div');
+                                itemDiv.className = 'hotkey-item';
+                                
+                                const titleSpan = document.createElement('span');
+                                titleSpan.textContent = hotkey.title;
+                                
+                                const comboButton = document.createElement('button');
+                                comboButton.className = 'hotkey-combo';
+                                comboButton.textContent = hotkey.binding || I18n.getString('hotkey_unassigned');
+                                
+                                comboButton.addEventListener('click', () => this.redirectToHotkeySettings(hotkey.name));
+
+                                itemDiv.appendChild(titleSpan);
+                                itemDiv.appendChild(comboButton);
+                                this.elements.hotkeysContainer.appendChild(itemDiv);
+                            }
+                        }
+                    }
+                });
+            }
+            
+            redirectToHotkeySettings(hotkeyId) {
+                const settingsUrl = `overwolf://settings/games-overlay?hotkey=${hotkeyId}`;
+                overwolf.utils.openUrlInDefaultBrowser(settingsUrl);
+            }
+            
+            changeLanguage(lang) {
+                localStorage.setItem('hllArtilleryLanguage', lang);
+                I18n.setLanguage(lang);
+                if (this.elements.languageSelect.value !== lang) {
+                    this.elements.languageSelect.value = lang;
+                }
+                this.elements.toggleLayoutButton.textContent = this.isCompact ? I18n.getString('toggle_layout_btn_full') : I18n.getString('toggle_layout_btn');
+                this.updateCalculation();
+            }
+            updateCalculation() { const faction = this.elements.factionSelect.value; const elevation = ArtilleryCalculator.calculate(faction, this.currentMeters); this.elements.elevationOutput.textContent = elevation; }
+            handleMetersInput() { const value = parseInt(this.elements.metersInput.value, 10); if (!isNaN(value)) { this.currentMeters = value; this.updateCalculation(); } else { this.elements.elevationOutput.textContent = '...'; } }
+            validateMetersInputOnBlur() { let value = parseInt(this.elements.metersInput.value, 10); if (isNaN(value) || value < 100) { value = 100; } if (value > 1600) { value = 1600; } this.currentMeters = value; this.elements.metersInput.value = this.currentMeters; this.updateCalculation(); }
+            handleMouseWheel(event) { event.preventDefault(); const direction = event.deltaY < 0 ? 1 : -1; this.adjustMeters(direction); }
+            adjustMeters(direction) {
+                this.currentMeters = parseInt(this.elements.metersInput.value, 10) || 100; this.currentMeters += direction; if (this.currentMeters < 100) this.currentMeters = 100; if (this.currentMeters > 1600) this.currentMeters = 1600; this.elements.metersInput.value = this.currentMeters; this.updateCalculation();
+            }
+            toggleLayout() { 
+                this.isCompact = !this.isCompact; 
+                this.elements.appContainer.classList.toggle('compact-layout', this.isCompact); 
+                this.elements.appContainer.classList.toggle('full-layout', !this.isCompact); 
+                this.elements.toggleLayoutButton.textContent = this.isCompact ? I18n.getString('toggle_layout_btn_full') : I18n.getString('toggle_layout_btn');
+                if (this.isCompact) {
+                    this.resetMapState();
+                    this.displaySelectedMap();
+                }
+            }
+        }
+
+        class DragService {
+            constructor(...elements) { this.elements = elements.filter(Boolean); }
+            run() { overwolf.windows.getCurrentWindow(result => { if (!result.success) { return; } const currentWindowId = result.window.id; this.elements.forEach(element => { element.addEventListener('mousedown', (e) => { if (e.buttons === 1 && e.target.closest('[data-i18n], .header, .footer, .settings-header')) { if (!e.target.closest('button, select')) { overwolf.windows.dragMove(currentWindowId); } } }); }); }); }
+        }
+
+        window.addEventListener('load', () => { if (typeof overwolf !== 'undefined') { const controller = new AppController(); controller.init(); } });
+    </script>
+</body>
+</html>
